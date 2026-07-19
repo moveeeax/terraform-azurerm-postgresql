@@ -9,7 +9,7 @@ disabled by default, and exposes the connection FQDN.
 
 ```hcl
 module "postgresql" {
-  source = "github.com/cybercapybara/terraform-azurerm-postgresql"
+  source = "github.com/moveeeax/terraform-azurerm-postgresql"
 
   name                = "prod-pgflex"
   resource_group_name = "prod-rg"
