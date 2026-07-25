@@ -24,8 +24,38 @@ jobs:
       - name: validate
         run: tofu validate
 
+      - name: test
+        run: tofu test
+
       - name: validate example
         working-directory: examples/basic
         run: |
           tofu init -backend=false
+          tofu validate
+
+  # The module claims a minimum azurerm version. Prove it, so an argument that
+  # only exists in a newer provider cannot silently break consumers who resolve
+  # the floor of the constraint.
+  minimum-provider:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_wrapper: false
+
+      - name: pin azurerm to the declared minimum and validate
+        run: |
+          cat > override.tf <<'EOF'
+          terraform {
+            required_providers {
+              azurerm = {
+                source  = "hashicorp/azurerm"
+                version = "3.105.0"
+              }
+            }
+          }
+          EOF
+          tofu init -backend=false -upgrade
           tofu validate
