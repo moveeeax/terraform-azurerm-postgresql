@@ -3,8 +3,14 @@ terraform {
 
   required_providers {
     azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 3.0"
+      source = "hashicorp/azurerm"
+      # 3.105.0 is the oldest provider this module actually works against:
+      #   - auto_grow_enabled does not exist on the resource up to 3.70.0
+      #     ("An argument named auto_grow_enabled is not expected here")
+      #   - public_network_access_enabled is a read-only computed attribute up
+      #     to 3.104.0 ("Value for unconfigurable attribute")
+      # Both were verified with `terraform validate` against pinned providers.
+      version = ">= 3.105.0, < 5.0"
     }
   }
 }
