@@ -128,7 +128,7 @@ variable "ssl_min_protocol_version" {
   default     = "TLSv1.2"
 
   validation {
-    condition     = var.ssl_min_protocol_version == null || contains(["TLSv1.2", "TLSv1.3"], coalesce(var.ssl_min_protocol_version, "TLSv1.2"))
+    condition     = var.ssl_min_protocol_version == null ? true : contains(["TLSv1.2", "TLSv1.3"], var.ssl_min_protocol_version)
     error_message = "ssl_min_protocol_version must be TLSv1.2 or TLSv1.3. TLS 1.0 and 1.1 are deprecated and are not offered by this module."
   }
 }

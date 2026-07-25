@@ -1,6 +1,16 @@
 # Requires Terraform >= 1.7 / OpenTofu >= 1.7 for mock_provider.
 
-mock_provider "azurerm" {}
+mock_provider "azurerm" {
+  # ssl_min_protocol_version drives a `count`, so OpenTofu expands and plans the
+  # configuration resource even on runs that are only meant to trip a variable
+  # validation. The provider parses server_id as a real Azure resource ID, so the
+  # mocked server needs a well-formed (but entirely fictional) one.
+  mock_resource "azurerm_postgresql_flexible_server" {
+    defaults = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/test-pgflex"
+    }
+  }
+}
 
 variables {
   name                   = "test-pgflex"
