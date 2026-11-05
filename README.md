@@ -9,7 +9,7 @@ disabled and TLS required by default, and exposes the connection FQDN.
 
 ```hcl
 module "postgresql" {
-  source = "github.com/moveeeax/terraform-azurerm-postgresql"
+  source = "github.com/moveeeax/terraform-azurerm-postgresql?ref=v1.0.0"
 
   name                = "prod-pgflex"
   resource_group_name = "prod-rg"
@@ -45,12 +45,14 @@ it will be written to state, so treat the state backend as a secret store too.
 | Name      | Version              |
 |-----------|----------------------|
 | terraform | >= 1.5               |
-| azurerm   | >= 3.105.0, < 5.0    |
+| azurerm   | >= 3.105.0, < 6.0    |
 
 The azurerm floor is not decorative: `public_network_access_enabled` is a
 read-only computed attribute on `azurerm_postgresql_flexible_server` up to
 azurerm 3.104.0, and `auto_grow_enabled` does not exist at all in older 3.x.
-Anything below 3.105.0 fails at plan time. CI validates against the floor.
+Anything below 3.105.0 fails at plan time. CI validates against the floor and
+runs the test suite against the latest 5.x release; 6.x is excluded until it
+has been tested.
 
 Running the test suite (`terraform test` / `tofu test`) additionally needs
 Terraform or OpenTofu >= 1.7 for `mock_provider`. That is a test-only
