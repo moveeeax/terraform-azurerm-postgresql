@@ -81,6 +81,25 @@ variable "zone" {
   default     = null
 }
 
+variable "high_availability" {
+  description = <<-EOT
+    High availability with a hot standby. mode is ZoneRedundant (standby in a
+    different availability zone) or SameZone (standby in the primary's zone).
+    standby_availability_zone is optional; null lets Azure choose. Not available
+    on Burstable (B_) SKUs. Null, the default, keeps HA disabled.
+  EOT
+  type = object({
+    mode                      = string
+    standby_availability_zone = optional(string)
+  })
+  default = null
+
+  validation {
+    condition     = var.high_availability == null ? true : contains(["ZoneRedundant", "SameZone"], var.high_availability.mode)
+    error_message = "high_availability.mode must be ZoneRedundant or SameZone."
+  }
+}
+
 variable "administrator_login" {
   description = "Administrator login name for the server. Changing this destroys and recreates the server."
   type        = string

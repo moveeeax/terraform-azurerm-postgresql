@@ -64,6 +64,7 @@ requirement; the module itself still supports 1.5.
 |-------------------------------|------------------------------------------------------|
 | Public network access         | disabled                                             |
 | Network mode                  | public access (no delegated subnet), no firewall rules |
+| High availability             | disabled (opt in; not available on Burstable SKUs)   |
 | TLS required for connections  | yes (`require_secure_transport = on`, pinned)        |
 | Minimum TLS version           | `TLSv1.2` (pinned; `TLSv1.3` also accepted)          |
 | Storage auto-grow             | enabled                                              |
@@ -117,6 +118,30 @@ The module enforces the combinations at plan time: `delegated_subnet_id` and
 `private_dns_zone_id` go together, a delegated subnet rules out public access,
 and firewall rules require public access.
 
+## High availability
+
+`high_availability` adds a hot standby that Azure fails over to automatically.
+It is off by default; turn it on for production. `ZoneRedundant` puts the
+standby in another availability zone, `SameZone` in the primary's zone.
+Burstable (`B_`) SKUs do not support HA and are rejected at plan time.
+
+```hcl
+  sku_name = "GP_Standard_D2s_v3"
+  zone     = "1"
+  high_availability = {
+    mode                      = "ZoneRedundant"
+    standby_availability_zone = "2" # optional; null lets Azure choose
+  }
+```
+
+After a failover Azure swaps `zone` and `standby_availability_zone`, and the
+next plan tries to move the primary back. The azurerm documentation suggests
+`ignore_changes` on `zone` and `high_availability[0].standby_availability_zone`
+if you do not want that. `ignore_changes` cannot be set from outside a module,
+so this module does not ignore them: after a failover, either accept the
+fail-back on the next apply or update `zone` and
+`high_availability.standby_availability_zone` to the new values.
+
 ## Inputs
 
 | Name                            | Description                                                                 | Type          | Default             | Required |
@@ -132,6 +157,7 @@ and firewall rules require public access.
 | `backup_retention_days`         | Days automated backups are retained, between 7 and 35.                      | `number`      | `7`                 |    no    |
 | `geo_redundant_backup_enabled`  | Replicate backups to the paired region. Creation-time only.                 | `bool`        | `false`             |    no    |
 | `zone`                          | Availability zone for the primary server. Null lets Azure choose.           | `string`      | `null`              |    no    |
+| `high_availability`             | HA standby: `mode` (`ZoneRedundant`, `SameZone`), optional `standby_availability_zone`. Not on `B_` SKUs. | `object({ mode = string, standby_availability_zone = optional(string) })` | `null` | no |
 | `administrator_login`           | Administrator login name. Reserved Azure names are rejected.                | `string`      | `"psqladmin"`       |    no    |
 | `public_network_access_enabled` | Whether the server is reachable over the public internet.                   | `bool`        | `false`             |    no    |
 | `delegated_subnet_id`           | Subnet for private access (VNet integration). Null keeps public access. ForceNew. | `string` | `null`          |    no    |

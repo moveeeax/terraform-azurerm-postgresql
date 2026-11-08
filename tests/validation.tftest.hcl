@@ -221,3 +221,29 @@ run "rejects_invalid_firewall_rule_name" {
 
   expect_failures = [var.firewall_rules]
 }
+
+run "rejects_unknown_high_availability_mode" {
+  command = plan
+
+  variables {
+    sku_name = "GP_Standard_D2s_v3"
+    high_availability = {
+      mode = "Disabled"
+    }
+  }
+
+  expect_failures = [var.high_availability]
+}
+
+run "rejects_high_availability_on_burstable_sku" {
+  command = plan
+
+  variables {
+    sku_name = "B_Standard_B1ms"
+    high_availability = {
+      mode = "ZoneRedundant"
+    }
+  }
+
+  expect_failures = [azurerm_postgresql_flexible_server.this]
+}

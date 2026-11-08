@@ -21,6 +21,18 @@ resource "azurerm_postgresql_flexible_server" "this" {
   delegated_subnet_id = var.delegated_subnet_id
   private_dns_zone_id = var.private_dns_zone_id
 
+  # No block when var.high_availability is null, so existing servers plan the
+  # same as before. After a failover Azure swaps zone and standby zone; see the
+  # README for the ignore_changes pattern if Terraform should not fail back.
+  dynamic "high_availability" {
+    for_each = var.high_availability == null ? [] : [var.high_availability]
+
+    content {
+      mode                      = high_availability.value.mode
+      standby_availability_zone = high_availability.value.standby_availability_zone
+    }
+  }
+
   tags = var.tags
 
   # These checks span several variables, and cross-variable validation blocks
@@ -39,6 +51,11 @@ resource "azurerm_postgresql_flexible_server" "this" {
     precondition {
       condition     = length(var.firewall_rules) == 0 || var.public_network_access_enabled
       error_message = "firewall_rules only govern public access, so they require public_network_access_enabled = true (which in turn rules out delegated_subnet_id)."
+    }
+
+    precondition {
+      condition     = var.high_availability == null || !startswith(var.sku_name, "B_")
+      error_message = "high_availability is not available on the Burstable tier. Use a General Purpose (GP_) or Memory Optimized (MO_) sku_name."
     }
   }
 }
