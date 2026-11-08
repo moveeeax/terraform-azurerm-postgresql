@@ -116,6 +116,77 @@ variable "public_network_access_enabled" {
   default     = false
 }
 
+variable "delegated_subnet_id" {
+  description = <<-EOT
+    ID of a subnet to place the server in (private access / VNet integration).
+    The subnet is delegated to Microsoft.DBforPostgreSQL/flexibleServers and must
+    not host anything else. Requires private_dns_zone_id and
+    public_network_access_enabled = false. Null keeps the server in public
+    access mode. Changing this on an existing server forces it to be destroyed
+    and recreated.
+  EOT
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.delegated_subnet_id == null ? true : can(regex("(?i)^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.Network/virtualNetworks/[^/]+/subnets/[^/]+$", var.delegated_subnet_id))
+    error_message = "delegated_subnet_id must be a subnet resource ID: /subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>."
+  }
+}
+
+variable "private_dns_zone_id" {
+  description = "ID of the private DNS zone that resolves the server name inside the VNet. Required with delegated_subnet_id, which it must accompany. The zone name must end with .postgres.database.azure.com."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.private_dns_zone_id == null ? true : can(regex("(?i)^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.Network/privateDnsZones/[^/]+\\.postgres\\.database\\.azure\\.com$", var.private_dns_zone_id))
+    error_message = "private_dns_zone_id must be a private DNS zone resource ID whose zone name ends with .postgres.database.azure.com."
+  }
+}
+
+variable "firewall_rules" {
+  description = <<-EOT
+    Firewall rules for a server in public access mode, keyed by rule name. Each
+    rule allows the inclusive IPv4 range start_ip_address..end_ip_address. Only
+    valid with public_network_access_enabled = true. The special range
+    0.0.0.0-0.0.0.0 allows connections from any Azure service, including
+    resources in other customers' subscriptions, so prefer explicit ranges.
+  EOT
+  type = map(object({
+    start_ip_address = string
+    end_ip_address   = string
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for name in keys(var.firewall_rules) : can(regex("^[a-zA-Z0-9_-]{1,128}$", name))])
+    error_message = "firewall_rules keys are used as rule names and must be 1-128 letters, digits, hyphens or underscores."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for rule in values(var.firewall_rules) : [
+        for ip in [rule.start_ip_address, rule.end_ip_address] :
+        can(regex("^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", ip))
+      ]
+    ]))
+    error_message = "Every firewall_rules start_ip_address and end_ip_address must be a dotted IPv4 address, e.g. 203.0.113.10."
+  }
+
+  validation {
+    # try(): a malformed address is reported by the block above, not here.
+    condition = alltrue([
+      for rule in values(var.firewall_rules) : try(
+        sum([for i, octet in split(".", rule.start_ip_address) : tonumber(octet) * pow(256, 3 - i)])
+        <= sum([for i, octet in split(".", rule.end_ip_address) : tonumber(octet) * pow(256, 3 - i)]),
+        true
+      )
+    ])
+    error_message = "Every firewall_rules start_ip_address must be less than or equal to its end_ip_address."
+  }
+}
+
 variable "require_secure_transport" {
   description = "Whether the server rejects connections that are not TLS encrypted. Pins the require_secure_transport server parameter instead of inheriting the Azure default."
   type        = bool
