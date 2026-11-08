@@ -6,6 +6,8 @@ All notable changes to this module are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-08
+
 ### Added
 
 - Private access: `delegated_subnet_id` and `private_dns_zone_id` place the
@@ -34,6 +36,7 @@ See the [v1.1.0 release](https://github.com/moveeeax/terraform-azurerm-postgresq
 
 Initial release (`v0.1.0` points at the same commit).
 
-[Unreleased]: https://github.com/moveeeax/terraform-azurerm-postgresql/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/moveeeax/terraform-azurerm-postgresql/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/moveeeax/terraform-azurerm-postgresql/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/moveeeax/terraform-azurerm-postgresql/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/moveeeax/terraform-azurerm-postgresql/releases/tag/v1.0.0
