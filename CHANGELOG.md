@@ -20,6 +20,11 @@ All notable changes to this module are documented here. The format follows
   Rules require `public_network_access_enabled = true`; names, address format
   and range order are validated.
 - Output `firewall_rule_ids`.
+- High availability: `high_availability = { mode, standby_availability_zone }`
+  renders the server's `high_availability` block. `mode` must be
+  `ZoneRedundant` or `SameZone`; a plan-time check rejects it on Burstable
+  (`B_`) SKUs. Defaults to null, so HA stays off and existing plans do not
+  change.
 
 ## [1.1.0] - 2026-11-05
 

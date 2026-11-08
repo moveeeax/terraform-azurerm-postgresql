@@ -59,6 +59,11 @@ run "defaults_are_safe" {
     condition     = length(azurerm_postgresql_flexible_server_firewall_rule.this) == 0
     error_message = "No firewall rules may be created by default."
   }
+
+  assert {
+    condition     = length(azurerm_postgresql_flexible_server.this.high_availability) == 0
+    error_message = "High availability must stay off by default so existing servers plan unchanged."
+  }
 }
 
 run "opting_into_public_access_is_explicit" {
@@ -151,5 +156,49 @@ run "firewall_rules_on_public_server" {
       && azurerm_postgresql_flexible_server_firewall_rule.this["office"].end_ip_address == "203.0.113.255"
     )
     error_message = "Firewall rule IP ranges must be wired through unchanged."
+  }
+}
+
+run "zone_redundant_high_availability" {
+  command = plan
+
+  variables {
+    sku_name = "GP_Standard_D2s_v3"
+    zone     = "1"
+    high_availability = {
+      mode                      = "ZoneRedundant"
+      standby_availability_zone = "2"
+    }
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.high_availability[0].mode == "ZoneRedundant"
+    error_message = "high_availability.mode must be wired through to the server."
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.high_availability[0].standby_availability_zone == "2"
+    error_message = "high_availability.standby_availability_zone must be wired through to the server."
+  }
+}
+
+run "same_zone_high_availability_without_standby_zone" {
+  command = plan
+
+  variables {
+    sku_name = "MO_Standard_E4ds_v5"
+    high_availability = {
+      mode = "SameZone"
+    }
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.high_availability[0].mode == "SameZone"
+    error_message = "SameZone must be accepted."
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.high_availability[0].standby_availability_zone == null
+    error_message = "An omitted standby_availability_zone must be left for Azure to choose."
   }
 }
