@@ -63,6 +63,7 @@ requirement; the module itself still supports 1.5.
 | Behaviour                     | Default                                              |
 |-------------------------------|------------------------------------------------------|
 | Public network access         | disabled                                             |
+| Network mode                  | public access (no delegated subnet), no firewall rules |
 | TLS required for connections  | yes (`require_secure_transport = on`, pinned)        |
 | Minimum TLS version           | `TLSv1.2` (pinned; `TLSv1.3` also accepted)          |
 | Storage auto-grow             | enabled                                              |
@@ -74,6 +75,47 @@ requirement; the module itself still supports 1.5.
 explicit `azurerm_postgresql_flexible_server_configuration` resources rather
 than left to inherit Azure's own parameter defaults, so out-of-band changes
 show up as drift.
+
+## Network access
+
+The server runs in one of two network modes, chosen at creation time.
+
+Public access (the default). `delegated_subnet_id` stays null and the server
+gets a public endpoint, which is closed while `public_network_access_enabled`
+is `false`. To let clients in, set it to `true` and list the allowed IPv4
+ranges in `firewall_rules`; with no rules, Azure accepts no client IPs.
+
+```hcl
+  public_network_access_enabled = true
+  firewall_rules = {
+    office    = { start_ip_address = "203.0.113.0", end_ip_address = "203.0.113.255" }
+    ci-runner = { start_ip_address = "198.51.100.7", end_ip_address = "198.51.100.7" }
+  }
+```
+
+The range `0.0.0.0`-`0.0.0.0` is Azure's "allow Azure services" switch. It
+admits any Azure resource, including ones in other customers' subscriptions,
+so prefer explicit ranges.
+
+Private access (VNet integration, recommended for production). Pass a subnet
+dedicated to the server and a private DNS zone whose name ends with
+`.postgres.database.azure.com`; `public_network_access_enabled` must stay
+`false` and `firewall_rules` empty.
+
+```hcl
+  delegated_subnet_id = azurerm_subnet.postgres.id
+  private_dns_zone_id = azurerm_private_dns_zone.postgres.id
+```
+
+Link the zone to the VNet (`azurerm_private_dns_zone_virtual_network_link`)
+and make the module depend on that link; the azurerm documentation example
+does the same. `delegated_subnet_id` is ForceNew: switching an
+existing server between public and private access destroys and recreates it,
+data included. Plan the mode before the first apply.
+
+The module enforces the combinations at plan time: `delegated_subnet_id` and
+`private_dns_zone_id` go together, a delegated subnet rules out public access,
+and firewall rules require public access.
 
 ## Inputs
 
@@ -92,6 +134,9 @@ show up as drift.
 | `zone`                          | Availability zone for the primary server. Null lets Azure choose.           | `string`      | `null`              |    no    |
 | `administrator_login`           | Administrator login name. Reserved Azure names are rejected.                | `string`      | `"psqladmin"`       |    no    |
 | `public_network_access_enabled` | Whether the server is reachable over the public internet.                   | `bool`        | `false`             |    no    |
+| `delegated_subnet_id`           | Subnet for private access (VNet integration). Null keeps public access. ForceNew. | `string` | `null`          |    no    |
+| `private_dns_zone_id`           | Private DNS zone (`*.postgres.database.azure.com`). Required with `delegated_subnet_id`. | `string` | `null`   |    no    |
+| `firewall_rules`                | Allowed IPv4 ranges, keyed by rule name. Requires public access.           | `map(object({ start_ip_address = string, end_ip_address = string }))` | `{}` | no |
 | `require_secure_transport`      | Reject connections that are not TLS encrypted.                              | `bool`        | `true`              |    no    |
 | `ssl_min_protocol_version`      | Minimum TLS version (`TLSv1.2`, `TLSv1.3`, or `null` to leave unmanaged).   | `string`      | `"TLSv1.2"`         |    no    |
 | `tags`                          | Map of tags applied to the server.                                          | `map(string)` | `{}`                |    no    |
@@ -103,6 +148,7 @@ show up as drift.
 | `id`   | ID of the PostgreSQL Flexible Server.              |
 | `name` | Name of the PostgreSQL Flexible Server.            |
 | `fqdn` | Fully qualified domain name to connect to the server.|
+| `firewall_rule_ids` | Map of firewall rule name to rule ID.          |
 
 ## Tests
 

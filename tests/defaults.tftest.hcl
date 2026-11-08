@@ -49,6 +49,16 @@ run "defaults_are_safe" {
     condition     = azurerm_postgresql_flexible_server.this.version == "16"
     error_message = "The default PostgreSQL major version must be one that is still in community support."
   }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.delegated_subnet_id == null
+    error_message = "The server must stay in public access mode by default: delegated_subnet_id is ForceNew, so a non-null default would recreate existing servers."
+  }
+
+  assert {
+    condition     = length(azurerm_postgresql_flexible_server_firewall_rule.this) == 0
+    error_message = "No firewall rules may be created by default."
+  }
 }
 
 run "opting_into_public_access_is_explicit" {
@@ -81,5 +91,65 @@ run "ssl_parameter_can_be_left_unmanaged" {
   assert {
     condition     = length(azurerm_postgresql_flexible_server_configuration.ssl_min_protocol_version) == 0
     error_message = "A null ssl_min_protocol_version must not create a configuration resource."
+  }
+}
+
+run "private_access_with_delegated_subnet" {
+  command = plan
+
+  variables {
+    delegated_subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/postgres"
+    private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/privateDnsZones/test.postgres.database.azure.com"
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.delegated_subnet_id == var.delegated_subnet_id
+    error_message = "delegated_subnet_id must be wired through to the server."
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.private_dns_zone_id == var.private_dns_zone_id
+    error_message = "private_dns_zone_id must be wired through to the server."
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server.this.public_network_access_enabled == false
+    error_message = "A VNet-integrated server must not be publicly reachable."
+  }
+}
+
+run "firewall_rules_on_public_server" {
+  command = plan
+
+  variables {
+    public_network_access_enabled = true
+    firewall_rules = {
+      office = {
+        start_ip_address = "203.0.113.0"
+        end_ip_address   = "203.0.113.255"
+      }
+      ci-runner = {
+        start_ip_address = "198.51.100.7"
+        end_ip_address   = "198.51.100.7"
+      }
+    }
+  }
+
+  assert {
+    condition     = length(azurerm_postgresql_flexible_server_firewall_rule.this) == 2
+    error_message = "One firewall rule must be created per firewall_rules entry."
+  }
+
+  assert {
+    condition     = azurerm_postgresql_flexible_server_firewall_rule.this["office"].name == "office"
+    error_message = "The firewall_rules key must be used as the rule name."
+  }
+
+  assert {
+    condition = (
+      azurerm_postgresql_flexible_server_firewall_rule.this["office"].start_ip_address == "203.0.113.0"
+      && azurerm_postgresql_flexible_server_firewall_rule.this["office"].end_ip_address == "203.0.113.255"
+    )
+    error_message = "Firewall rule IP ranges must be wired through unchanged."
   }
 }

@@ -88,3 +88,136 @@ run "rejects_invalid_server_name" {
 
   expect_failures = [var.name]
 }
+
+run "rejects_malformed_delegated_subnet_id" {
+  command = plan
+
+  variables {
+    delegated_subnet_id = "test-vnet/postgres"
+    private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/privateDnsZones/test.postgres.database.azure.com"
+  }
+
+  expect_failures = [var.delegated_subnet_id]
+}
+
+run "rejects_private_dns_zone_with_wrong_suffix" {
+  command = plan
+
+  variables {
+    delegated_subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/postgres"
+    private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/privateDnsZones/example.internal"
+  }
+
+  expect_failures = [var.private_dns_zone_id]
+}
+
+run "rejects_delegated_subnet_without_private_dns_zone" {
+  command = plan
+
+  variables {
+    delegated_subnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/postgres"
+  }
+
+  expect_failures = [azurerm_postgresql_flexible_server.this]
+}
+
+run "rejects_private_dns_zone_without_delegated_subnet" {
+  command = plan
+
+  variables {
+    private_dns_zone_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/privateDnsZones/test.postgres.database.azure.com"
+  }
+
+  expect_failures = [azurerm_postgresql_flexible_server.this]
+}
+
+run "rejects_public_access_with_delegated_subnet" {
+  command = plan
+
+  variables {
+    delegated_subnet_id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/postgres"
+    private_dns_zone_id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.Network/privateDnsZones/test.postgres.database.azure.com"
+    public_network_access_enabled = true
+  }
+
+  expect_failures = [azurerm_postgresql_flexible_server.this]
+}
+
+run "rejects_firewall_rules_without_public_access" {
+  command = plan
+
+  variables {
+    firewall_rules = {
+      office = {
+        start_ip_address = "203.0.113.0"
+        end_ip_address   = "203.0.113.255"
+      }
+    }
+  }
+
+  expect_failures = [azurerm_postgresql_flexible_server.this]
+}
+
+run "rejects_invalid_firewall_rule_ip" {
+  command = plan
+
+  variables {
+    public_network_access_enabled = true
+    firewall_rules = {
+      office = {
+        start_ip_address = "203.0.113.300"
+        end_ip_address   = "203.0.113.255"
+      }
+    }
+  }
+
+  expect_failures = [var.firewall_rules]
+}
+
+run "rejects_ipv6_firewall_rule" {
+  command = plan
+
+  variables {
+    public_network_access_enabled = true
+    firewall_rules = {
+      office = {
+        start_ip_address = "2001:db8::1"
+        end_ip_address   = "2001:db8::ff"
+      }
+    }
+  }
+
+  expect_failures = [var.firewall_rules]
+}
+
+run "rejects_reversed_firewall_rule_range" {
+  command = plan
+
+  variables {
+    public_network_access_enabled = true
+    firewall_rules = {
+      office = {
+        start_ip_address = "203.0.113.255"
+        end_ip_address   = "203.0.113.0"
+      }
+    }
+  }
+
+  expect_failures = [var.firewall_rules]
+}
+
+run "rejects_invalid_firewall_rule_name" {
+  command = plan
+
+  variables {
+    public_network_access_enabled = true
+    firewall_rules = {
+      "office wifi" = {
+        start_ip_address = "203.0.113.0"
+        end_ip_address   = "203.0.113.255"
+      }
+    }
+  }
+
+  expect_failures = [var.firewall_rules]
+}
